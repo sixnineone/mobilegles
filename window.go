@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"runtime"
 	"sync"
+	"unsafe"
 )
 
 // EventType represents different event types
@@ -626,6 +627,38 @@ func (w *Window) osHandle() *sdlWin {
 
 // SetTitle updates the OS title bar text.
 func (w *Window) SetTitle(title string) { SetSDLWinTitle(w.osHandle(), title) }
+
+// SetIcon sets the window icon shown by the window manager and the taskbar.
+// pixels are 0xAARRGGBB, TOP-DOWN, straight (unpremultiplied) alpha, as
+// SDL_PIXELFORMAT_ARGB8888 expects; the caller owns the slice only for the
+// duration of the call (SDL copies the surface).
+//
+// It returns false when SDL has no window yet or the pixel buffer is short.
+func (w *Window) SetIcon(pixels []uint32, width, height int) bool {
+	handle := w.osHandle()
+	if handle == nil || handle.win == nil || width <= 0 || height <= 0 {
+		return false
+	}
+	if len(pixels) < width*height {
+		return false
+	}
+	loadWindowIconFuncs()
+	if SDL3_SetWindowIcon == nil || SDL3_CreateSurfaceFrom == nil || SDL3_DestroySurface == nil {
+		return false
+	}
+	surface := SDL3_CreateSurfaceFrom(
+		int32(width), int32(height),
+		SDL3_PIXELFORMAT_ARGB8888,
+		unsafe.Pointer(&pixels[0]),
+		int32(width*4),
+	)
+	if surface == nil {
+		return false
+	}
+	ok := SDL3_SetWindowIcon(handle.win, surface)
+	SDL3_DestroySurface(surface)
+	return ok
+}
 
 // Raise brings the window to the front of the stacking order.
 func (w *Window) Raise() { RaiseSDLWindow(w.osHandle()) }

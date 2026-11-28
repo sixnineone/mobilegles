@@ -38,7 +38,13 @@ var (
 	SDL3_SetWindowSizeMulti       func(win unsafe.Pointer, w, h int32)
 	SDL3_SetWindowFullscreenMulti func(win unsafe.Pointer, fullscreen bool) bool
 	SDL3_GetErrorMulti            func() uintptr
+	SDL3_SetWindowIcon            func(win unsafe.Pointer, icon unsafe.Pointer) bool
+	SDL3_CreateSurfaceFrom        func(w, h int32, format uint32, pixels unsafe.Pointer, pitch int32) unsafe.Pointer
+	SDL3_DestroySurface           func(surface unsafe.Pointer)
 )
+
+// SDL_PIXELFORMAT_ARGB8888 from SDL3's SDL_pixels.h.
+const SDL3_PIXELFORMAT_ARGB8888 uint32 = 0x16362004
 
 // sdlWin is one OS window + its GL context.
 type sdlWin struct {
@@ -97,6 +103,22 @@ func loadMultiWindowFuncs() {
 	purego.RegisterLibFunc(&SDL3_RaiseWindowMulti, libSDL3, "SDL_RaiseWindow")
 	purego.RegisterLibFunc(&SDL3_SetWindowFullscreenMulti, libSDL3, "SDL_SetWindowFullscreen")
 	purego.RegisterLibFunc(&SDL3_GetErrorMulti, libSDL3, "SDL_GetError")
+	purego.RegisterLibFunc(&SDL3_SetWindowIcon, libSDL3, "SDL_SetWindowIcon")
+	purego.RegisterLibFunc(&SDL3_CreateSurfaceFrom, libSDL3, "SDL_CreateSurfaceFrom")
+	purego.RegisterLibFunc(&SDL3_DestroySurface, libSDL3, "SDL_DestroySurface")
+}
+
+// loadWindowIconFuncs is its own once: loadMultiWindowFuncs returns early once
+// the window registry is loaded, so hanging the icon registration off it meant
+// the first SetIcon after a window existed found nil function pointers.
+var windowIconFuncs sync.Once
+
+func loadWindowIconFuncs() {
+	windowIconFuncs.Do(func() {
+		purego.RegisterLibFunc(&SDL3_SetWindowIcon, libSDL3, "SDL_SetWindowIcon")
+		purego.RegisterLibFunc(&SDL3_CreateSurfaceFrom, libSDL3, "SDL_CreateSurfaceFrom")
+		purego.RegisterLibFunc(&SDL3_DestroySurface, libSDL3, "SDL_DestroySurface")
+	})
 }
 
 // sdlError returns SDL's last error string.
